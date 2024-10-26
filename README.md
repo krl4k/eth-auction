@@ -11,3 +11,20 @@ REPORT_GAS=true npx hardhat test
 npx hardhat node
 npx hardhat ignition deploy ./ignition/modules/Auction.sol.ts
 ```
+
+
+# Deploying the contract
+
+```bash
+
+# start the local node
+npx hardhat node
+
+# deploy the contract
+npx hardhat ignition deploy ignition/modules/DutchAuctionModule.ts --network localhost
+
+# start the console to interact with the contract
+npx hardhat console --network localhost
+
+
+```

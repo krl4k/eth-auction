@@ -19,24 +19,38 @@ contract DutchAuctionWithFee is ReentrancyGuard, Ownable {
     uint256 public auctionIdCounter;
     uint256 public platformFeePercentage;
     uint256 public constant PERCENTAGE_BASE = 10000; // 100% = 10000
+    uint256 public constant MAX_FEE = 1000; // Max 10%
+    uint256 public constant MIN_DURATION = 1 minutes;
+    uint256 public constant MAX_DURATION = 7 days;
 
-    event AuctionCreated(uint256 auctionId, address seller, string itemDescription, uint256 startingPrice, uint256 endingPrice, uint256 duration);
-    event AuctionSuccessful(uint256 auctionId, address buyer, uint256 price);
-    event AuctionCancelled(uint256 auctionId);
+    event AuctionCreated(uint256 indexed auctionId, address indexed seller, string itemDescription, uint256 startingPrice, uint256 endingPrice, uint256 duration);
+    event AuctionSuccessful(uint256 indexed auctionId, address indexed buyer, uint256 price);
+    event AuctionCancelled(uint256 indexed auctionId);
+    event PlatformFeeUpdated(uint256 oldFee, uint256 newFee);
+
+    error InvalidFeePercentage(uint256 fee);
+    error InvalidPrice();
+    error InvalidDuration(uint256 duration);
+    error AuctionNotActive();
+    error AuctionExpired();
+    error InsufficientPayment(uint256 required, uint256 sent);
+    error NotSeller();
+    error TransferFailed();
 
     constructor(uint256 _platformFeePercentage) Ownable(msg.sender) {
-        require(_platformFeePercentage <= 1000, "Fee percentage too high"); // Max 10%
+        if (_platformFeePercentage > MAX_FEE) revert InvalidFeePercentage(_platformFeePercentage);
         platformFeePercentage = _platformFeePercentage;
     }
 
     function createAuction(
-        string memory _itemDescription,
+        string calldata _itemDescription,
         uint256 _startingPrice,
         uint256 _endingPrice,
         uint256 _duration
-    ) external {
-        require(_startingPrice >= _endingPrice, "Starting price must be >= ending price");
-        require(_duration > 0, "Duration must be > 0");
+    ) external returns (uint256) {
+        if (_startingPrice < _endingPrice) revert InvalidPrice();
+        if (_duration < MIN_DURATION || _duration > MAX_DURATION)
+            revert InvalidDuration(_duration);
 
         uint256 auctionId = auctionIdCounter++;
         auctions[auctionId] = Auction({
@@ -50,11 +64,12 @@ contract DutchAuctionWithFee is ReentrancyGuard, Ownable {
         });
 
         emit AuctionCreated(auctionId, msg.sender, _itemDescription, _startingPrice, _endingPrice, _duration);
+        return auctionId;
     }
 
     function getCurrentPrice(uint256 _auctionId) public view returns (uint256) {
         Auction storage auction = auctions[_auctionId];
-        require(auction.active, "Auction is not active");
+        if (!auction.active) revert AuctionNotActive();
 
         uint256 elapsed = block.timestamp - auction.startAt;
         if (elapsed >= auction.duration) {
@@ -67,23 +82,29 @@ contract DutchAuctionWithFee is ReentrancyGuard, Ownable {
 
     function buy(uint256 _auctionId) external payable nonReentrant {
         Auction storage auction = auctions[_auctionId];
-        require(auction.active, "Auction is not active");
-        require(block.timestamp < auction.startAt + auction.duration, "Auction expired");
+        if (!auction.active) revert AuctionNotActive();
+        if (block.timestamp >= auction.startAt + auction.duration)
+            revert AuctionExpired();
 
         uint256 price = getCurrentPrice(_auctionId);
-        require(msg.value >= price, "Not enough ETH sent");
+        if (msg.value < price)
+            revert InsufficientPayment(price, msg.value);
 
         auction.active = false;
 
         uint256 platformFee = (price * platformFeePercentage) / PERCENTAGE_BASE;
         uint256 sellerProceeds = price - platformFee;
 
-        auction.seller.transfer(sellerProceeds);
-        payable(owner()).transfer(platformFee);
+        (bool success1, ) = auction.seller.call{value: sellerProceeds}("");
+        if (!success1) revert TransferFailed();
+
+        (bool success2, ) = payable(owner()).call{value: platformFee}("");
+        if (!success2) revert TransferFailed();
 
         // Refund excess payment
         if (msg.value > price) {
-            payable(msg.sender).transfer(msg.value - price);
+            (bool success3, ) = payable(msg.sender).call{value: msg.value - price}("");
+            if (!success3) revert TransferFailed();
         }
 
         emit AuctionSuccessful(_auctionId, msg.sender, price);
@@ -91,16 +112,42 @@ contract DutchAuctionWithFee is ReentrancyGuard, Ownable {
 
     function cancelAuction(uint256 _auctionId) external {
         Auction storage auction = auctions[_auctionId];
-        require(msg.sender == auction.seller, "Not the seller");
-        require(auction.active, "Auction is not active");
+
+        if (!auction.active) revert AuctionNotActive();
+        if (msg.sender != auction.seller) revert NotSeller();
 
         auction.active = false;
-
         emit AuctionCancelled(_auctionId);
     }
 
     function updatePlatformFeePercentage(uint256 _newFeePercentage) external onlyOwner {
-        require(_newFeePercentage <= 1000, "Fee percentage too high"); // Max 10%
+        if (_newFeePercentage > MAX_FEE) revert InvalidFeePercentage(_newFeePercentage);
+
+        uint256 oldFee = platformFeePercentage;
         platformFeePercentage = _newFeePercentage;
+
+        emit PlatformFeeUpdated(oldFee, _newFeePercentage);
+    }
+
+    // View functions
+    function getAuction(uint256 _auctionId) external view returns (
+        address seller,
+        string memory itemDescription,
+        uint256 startingPrice,
+        uint256 endingPrice,
+        uint256 duration,
+        uint256 startAt,
+        bool active
+    ) {
+        Auction storage auction = auctions[_auctionId];
+        return (
+            auction.seller,
+            auction.itemDescription,
+            auction.startingPrice,
+            auction.endingPrice,
+            auction.duration,
+            auction.startAt,
+            auction.active
+        );
     }
 }
