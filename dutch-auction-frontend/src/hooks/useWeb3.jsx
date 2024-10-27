@@ -39,7 +39,6 @@ const useWeb3 = () => {
                 throw new Error('Пожалуйста, переключитесь на поддерживаемую сеть');
             }
 
-            // Создание экземпляра контракта
             const contract = new ethers.Contract(
                 CONTRACT_ADDRESS,
                 CONTRACT_ABI,

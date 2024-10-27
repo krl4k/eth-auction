@@ -1,4 +1,4 @@
-!include:client/.gitignore
+!include:dutch-auction-frontend/.gitignore
 
 node_modules
 .env
