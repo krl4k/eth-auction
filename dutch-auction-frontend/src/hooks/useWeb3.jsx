@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
-import { CONTRACT_ADDRESS, CONTRACT_ABI, SUPPORTED_CHAINS } from '../constants/contract';
+import { CONTRACT_ADDRESS, SUPPORTED_CHAINS } from '../constants/contract';
+import { abi as CONTRACT_ABI } from "../../../artifacts/contracts/Auction.sol/DutchAuctionWithFee.json";
 
 const useWeb3 = () => {
     const [account, setAccount] = useState('');
@@ -9,34 +10,14 @@ const useWeb3 = () => {
     const [signer, setSigner] = useState(null);
     const [contract, setContract] = useState(null);
     const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isInitialized, setIsInitialized] = useState(false);
 
-    // Подключение к MetaMask
-    const connectWallet = useCallback(async () => {
-        if (!window.ethereum) {
-            setError('Пожалуйста, установите MetaMask');
-            return;
-        }
-
+    const initializeContract = async (signer) => {
         try {
-            setIsLoading(true);
-            setError('');
-
-            // Запрос на подключение аккаунта
-            const accounts = await window.ethereum.request({
-                method: 'eth_requestAccounts'
-            });
-
-            // Получение провайдера и подписчика
-            const provider = new ethers.BrowserProvider(window.ethereum);
-            const signer = await provider.getSigner();
-            const network = await provider.getNetwork();
-
-            // Проверка поддерживаемой сети
-            const chainId = network.chainId.toString(16);
-            if (!SUPPORTED_CHAINS[chainId]) {
-                throw new Error('Пожалуйста, переключитесь на поддерживаемую сеть');
-            }
+            console.log('Initializing contract...');
+            console.log('Contract address:', CONTRACT_ADDRESS);
+            console.log('Contract ABI:', CONTRACT_ABI);
 
             const contract = new ethers.Contract(
                 CONTRACT_ADDRESS,
@@ -44,29 +25,97 @@ const useWeb3 = () => {
                 signer
             );
 
-            setAccount(accounts[0]);
-            setChainId(`0x${chainId}`);
-            setProvider(provider);
-            setSigner(signer);
+            console.log('Contract initialized:', await contract.getAddress());
             setContract(contract);
+            return contract;
+        } catch (err) {
+            console.error('Contract initialization error:', err);
+            setError('Failed to initialize contract');
+            throw err;
+        }
+    };
 
+    const setupProviderAndSigner = async (ethereum) => {
+        const provider = new ethers.BrowserProvider(ethereum);
+        const signer = await provider.getSigner();
+        const network = await provider.getNetwork();
+        const chainId = network.chainId.toString(16);
+
+        console.log('Chain ID:', chainId);
+        if (!SUPPORTED_CHAINS[chainId]) {
+            throw new Error('Please switch to a supported network');
+        }
+
+        setProvider(provider);
+        setSigner(signer);
+        setChainId(chainId);
+        await initializeContract(signer);
+    };
+
+    const initialize = useCallback(async () => {
+        if (!window.ethereum || isInitialized) return;
+
+        try {
+            setIsLoading(true);
+            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+
+            if (accounts.length > 0) {
+                await setupProviderAndSigner(window.ethereum);
+                setAccount(accounts[0]);
+            }
+        } catch (err) {
+            console.error('Initialization error:', err);
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+            setIsInitialized(true);
+        }
+    }, [isInitialized]);
+
+    const connectWallet = async () => {
+        if (!window.ethereum) {
+            setError('Please install MetaMask');
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            setError('');
+
+            const accounts = await window.ethereum.request({
+                method: 'eth_requestAccounts'
+            });
+
+            await setupProviderAndSigner(window.ethereum);
+            setAccount(accounts[0]);
         } catch (err) {
             setError(err.message);
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    };
 
-    // Получение списка аукционов
     const getAuctions = useCallback(async () => {
-        if (!contract) return [];
+        if (!contract) {
+            console.error('Contract is not initialized');
+            return [];
+        }
 
         try {
             setIsLoading(true);
+            console.log('Fetching auction count...');
+
+            // Попробуем получить контракт и его методы
+            console.log('Contract address:', await contract.getAddress());
+            console.log('Contract methods:', contract.interface.fragments);
+
             const auctionCount = await contract.auctionIdCounter();
+            console.log('Auction count:', auctionCount);
+
             const auctions = [];
 
             for (let i = 0; i < auctionCount; i++) {
+                console.log(`Fetching auction ${i}...`);
                 const auction = await contract.getAuction(i);
                 const currentPrice = await contract.getCurrentPrice(i);
 
@@ -85,86 +134,75 @@ const useWeb3 = () => {
 
             return auctions;
         } catch (err) {
-            setError('Ошибка при загрузке аукционов: ' + err.message);
+            console.error('Full error:', err);
+            setError('Failed to load auctions: ' + err.message);
             return [];
         } finally {
             setIsLoading(false);
         }
     }, [contract]);
 
-    // Создание аукциона
     const createAuction = useCallback(async (itemDescription, startingPrice, endingPrice, duration) => {
-        if (!contract) throw new Error('Контракт не инициализирован');
+        if (!contract) throw new Error('Contract not initialized');
 
         try {
             setIsLoading(true);
-            setError('');
-
             const tx = await contract.createAuction(
                 itemDescription,
                 ethers.parseEther(startingPrice.toString()),
                 ethers.parseEther(endingPrice.toString()),
-                duration * 60 // конвертируем минуты в секунды
+                duration * 60
             );
-
             await tx.wait();
             return tx.hash;
         } catch (err) {
-            setError('Ошибка при создании аукциона: ' + err.message);
             throw err;
         } finally {
             setIsLoading(false);
         }
     }, [contract]);
 
-    // Покупка предмета
     const buyItem = useCallback(async (auctionId, price) => {
-        if (!contract) throw new Error('Контракт не инициализирован');
+        if (!contract) throw new Error('Contract not initialized');
 
         try {
             setIsLoading(true);
-            setError('');
-
-            const tx = await contract.buy(auctionId, {
-                value: price
-            });
-
+            const tx = await contract.buy(auctionId, { value: price });
             await tx.wait();
             return tx.hash;
         } catch (err) {
-            setError('Ошибка при покупке: ' + err.message);
             throw err;
         } finally {
             setIsLoading(false);
         }
     }, [contract]);
 
-    // Отмена аукциона
     const cancelAuction = useCallback(async (auctionId) => {
-        if (!contract) throw new Error('Контракт не инициализирован');
+        if (!contract) throw new Error('Contract not initialized');
 
         try {
             setIsLoading(true);
-            setError('');
-
             const tx = await contract.cancelAuction(auctionId);
             await tx.wait();
             return tx.hash;
         } catch (err) {
-            setError('Ошибка при отмене аукциона: ' + err.message);
             throw err;
         } finally {
             setIsLoading(false);
         }
     }, [contract]);
 
-    // Обработчики событий MetaMask
     useEffect(() => {
+        initialize();
+
         if (window.ethereum) {
             window.ethereum.on('accountsChanged', (accounts) => {
-                setAccount(accounts[0] || '');
-                if (!accounts[0]) {
-                    setError('Пожалуйста, подключите кошелек');
+                if (accounts.length === 0) {
+                    setAccount('');
+                    setError('Please connect your wallet');
+                } else {
+                    setAccount(accounts[0]);
+                    setError('');
                 }
             });
 
@@ -174,7 +212,7 @@ const useWeb3 = () => {
 
             window.ethereum.on('disconnect', () => {
                 setAccount('');
-                setError('Кошелек отключен');
+                setError('Wallet disconnected');
             });
         }
 
@@ -183,7 +221,7 @@ const useWeb3 = () => {
                 window.ethereum.removeAllListeners();
             }
         };
-    }, []);
+    }, [initialize]);
 
     return {
         account,
