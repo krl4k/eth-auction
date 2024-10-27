@@ -34,7 +34,6 @@ const useWeb3 = () => {
 
             // Проверка поддерживаемой сети
             const chainId = network.chainId.toString(16);
-            console.log('chainId', chainId);
             if (!SUPPORTED_CHAINS[chainId]) {
                 throw new Error('Пожалуйста, переключитесь на поддерживаемую сеть');
             }
