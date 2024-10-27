@@ -2,14 +2,16 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Alert, AlertDescription } from './ui/alert';
-import {SUPPORTED_CHAINS} from "../constants/contract.js";
+import { LogOut } from 'lucide-react';
+import {SUPPORTED_CHAINS} from "../constants/contract.js"; // Импортируем иконку
 
 const WalletConnection = ({
                               account,
                               chainId,
                               isConnecting,
                               error,
-                              onConnect
+                              onConnect,
+                              onDisconnect
                           }) => {
     const shortenAddress = (address) => {
         if (!address) return '';
@@ -75,10 +77,23 @@ const WalletConnection = ({
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Dutch Auction</CardTitle>
-                <CardDescription>
-                    Децентрализованный аукцион с понижением цены
-                </CardDescription>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle>Dutch Auction</CardTitle>
+                        <CardDescription>
+                            Децентрализованный аукцион с понижением цены
+                        </CardDescription>
+                    </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={onDisconnect}
+                        className="flex items-center gap-2"
+                    >
+                        <LogOut className="h-4 w-4" />
+                        Сменить кошелек
+                    </Button>
+                </div>
             </CardHeader>
             <CardContent>
                 <div className="space-y-4">

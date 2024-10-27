@@ -13,27 +13,69 @@ const useWeb3 = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
 
+    const resetState = () => {
+        setAccount('');
+        setChainId('');
+        setProvider(null);
+        setSigner(null);
+        setContract(null);
+        setError('');
+        setIsInitialized(false);
+    };
+
+    const disconnect = async () => {
+        try {
+            if (window.ethereum) {
+                resetState();
+
+                // Запрашиваем новое подключение после отключения
+                // Это заставит MetaMask показать окно выбора аккаунта
+                await window.ethereum.request({
+                    method: "wallet_requestPermissions",
+                    params: [{
+                        eth_accounts: {}
+                    }]
+                });
+
+                // После выбора нового аккаунта, подключаемся к нему
+                const accounts = await window.ethereum.request({
+                    method: 'eth_requestAccounts'
+                });
+
+                if (accounts.length > 0) {
+                    const provider = new ethers.BrowserProvider(window.ethereum);
+                    const signer = await provider.getSigner();
+                    const network = await provider.getNetwork();
+                    const chainId = '0x' + network.chainId.toString(16);
+
+                    setAccount(accounts[0]);
+                    setChainId(chainId);
+                    setProvider(provider);
+                    setSigner(signer);
+                    await initializeContract(signer);
+                }
+            }
+        } catch (err) {
+            console.error('Error during disconnection:', err);
+            // Если пользователь отменил выбор аккаунта, сбрасываем состояние
+            resetState();
+        }
+    };
+
     const initializeContract = async (signer) => {
         try {
-            console.log('Initializing contract...');
-            console.log('Contract address:', CONTRACT_ADDRESS);
-            console.log('Contract ABI:', CONTRACT_ABI);
-
             const contract = new ethers.Contract(
                 CONTRACT_ADDRESS,
                 CONTRACT_ABI,
                 signer
             );
-
-            console.log('Contract initialized:', await contract.getAddress());
             setContract(contract);
-            return contract;
         } catch (err) {
             console.error('Contract initialization error:', err);
             setError('Failed to initialize contract');
-            throw err;
         }
     };
+
 
     const setupProviderAndSigner = async (ethereum) => {
         const provider = new ethers.BrowserProvider(ethereum);
@@ -223,6 +265,8 @@ const useWeb3 = () => {
         };
     }, [initialize]);
 
+
+
     return {
         account,
         chainId,
@@ -232,6 +276,7 @@ const useWeb3 = () => {
         error,
         isLoading,
         connectWallet,
+        disconnect,
         getAuctions,
         createAuction,
         buyItem,

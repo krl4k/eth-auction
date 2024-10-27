@@ -22,6 +22,7 @@ function App() {
         error: web3Error,
         isLoading: web3Loading,
         connectWallet,
+        disconnect,
         getAuctions,
         createAuction,
         buyItem,
@@ -169,6 +170,7 @@ function App() {
                         isConnecting={web3Loading}
                         error={web3Error}
                         onConnect={connectWallet}
+                        onDisconnect={disconnect}
                     />
                 </div>
             </header>

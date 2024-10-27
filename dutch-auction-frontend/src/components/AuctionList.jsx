@@ -1,4 +1,6 @@
-// components/AuctionList.js
+import {Alert, AlertDescription} from "./ui/alert.jsx";
+import AuctionCard from "./AuctionCard.jsx";
+
 const AuctionList = ({
                          auctions,
                          account,

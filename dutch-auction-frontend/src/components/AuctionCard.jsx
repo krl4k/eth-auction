@@ -12,12 +12,10 @@ const AuctionCard = ({
                      }) => {
     const [timeLeft, setTimeLeft] = useState('');
 
-    // Форматирование цены из wei в ETH с 3 десятичными знаками
     const formatPrice = (price) => {
         return Number(ethers.formatEther(price)).toFixed(3);
     };
 
-    // Форматирование оставшегося времени
     const calculateTimeLeft = () => {
         const now = Date.now() / 1000; // текущее время в секундах
         const endTime = Number(auction.startAt) + Number(auction.duration);
@@ -30,7 +28,6 @@ const AuctionCard = ({
         return `${minutes}м ${seconds}с`;
     };
 
-    // Обновление таймера каждую секунду
     useEffect(() => {
         if (!auction.active) return;
 
@@ -41,7 +38,6 @@ const AuctionCard = ({
         return () => clearInterval(timer);
     }, [auction]);
 
-    // Определяем, является ли текущий пользователь продавцом
     const isSeller = account?.toLowerCase() === auction.seller.toLowerCase();
 
     return (
