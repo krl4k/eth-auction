@@ -129,7 +129,6 @@ contract DutchAuctionWithFee is ReentrancyGuard, Ownable {
         emit PlatformFeeUpdated(oldFee, _newFeePercentage);
     }
 
-    // View functions
     function getAuction(uint256 _auctionId) external view returns (
         address seller,
         string memory itemDescription,
