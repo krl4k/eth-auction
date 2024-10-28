@@ -6,6 +6,11 @@ A simple decentralized application (DApp) implementing a Dutch auction mechanism
 
 A Dutch auction is a price discovery mechanism where the price starts high and gradually decreases over time until a buyer makes a purchase. This implementation includes basic features with several simplifications for educational purposes.
 
+![img_2.png](img_2.png)
+
+![img_1.png](img_1.png)
+
+
 ## Simplifications & Limitations
 
 - No real item/token ownership tracking
