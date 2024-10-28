@@ -137,48 +137,73 @@ const useWeb3 = () => {
         }
     };
 
+
     const getAuctions = useCallback(async () => {
-        if (!contract) {
-            console.error('Contract is not initialized');
-            return [];
-        }
+        if (!contract) return [];
 
         try {
             setIsLoading(true);
-            console.log('Fetching auction count...');
-
-            // Попробуем получить контракт и его методы
-            console.log('Contract address:', await contract.getAddress());
-            console.log('Contract methods:', contract.interface.fragments);
-
             const auctionCount = await contract.auctionIdCounter();
-            console.log('Auction count:', auctionCount);
-
             const auctions = [];
 
             for (let i = 0; i < auctionCount; i++) {
-                console.log(`Fetching auction ${i}...`);
-                const auction = await contract.getAuction(i);
-                const currentPrice = await contract.getCurrentPrice(i);
+                try {
+                    const auction = await contract.getAuction(i);
+                    let currentPrice;
 
-                auctions.push({
-                    id: i,
-                    seller: auction.seller,
-                    itemDescription: auction.itemDescription,
-                    startingPrice: auction.startingPrice,
-                    endingPrice: auction.endingPrice,
-                    duration: auction.duration,
-                    startAt: auction.startAt,
-                    currentPrice: currentPrice,
-                    active: auction.active
-                });
+                    try {
+                        currentPrice = await contract.getCurrentPrice(i);
+                    } catch (priceError) {
+                        // Если не можем получить текущую цену, используем конечную
+                        currentPrice = auction.endingPrice;
+                    }
+
+                    // Проверяем, не истекло ли время аукциона
+                    const now = Math.floor(Date.now() / 1000);
+                    const endTime = Number(auction.startAt) + Number(auction.duration);
+                    const isExpired = now >= endTime;
+
+                    auctions.push({
+                        id: i,
+                        seller: auction.seller,
+                        itemDescription: auction.itemDescription,
+                        startingPrice: auction.startingPrice,
+                        endingPrice: auction.endingPrice,
+                        duration: auction.duration,
+                        startAt: auction.startAt,
+                        currentPrice: currentPrice,
+                        // Аукцион считается активным, только если он помечен как активный И не истек
+                        active: auction.active && !isExpired
+                    });
+                } catch (auctionError) {
+                    // Если аукцион неактивен или произошла другая ошибка, создаем неактивную запись
+                    console.log(`Error loading auction ${i}:`, auctionError);
+
+                    try {
+                        // Пытаемся получить базовую информацию об аукционе
+                        const auctionInfo = await contract.auctions(i);
+                        auctions.push({
+                            id: i,
+                            seller: auctionInfo.seller,
+                            itemDescription: auctionInfo.itemDescription,
+                            startingPrice: auctionInfo.startingPrice,
+                            endingPrice: auctionInfo.endingPrice,
+                            duration: auctionInfo.duration,
+                            startAt: auctionInfo.startAt,
+                            currentPrice: auctionInfo.endingPrice,
+                            active: false // Помечаем как неактивный
+                        });
+                    } catch (fallbackError) {
+                        // Если совсем не получается получить информацию, пропускаем этот аукцион
+                        console.log(`Failed to load fallback auction data for ${i}:`, fallbackError);
+                    }
+                }
             }
 
             return auctions;
         } catch (err) {
-            console.error('Full error:', err);
-            setError('Failed to load auctions: ' + err.message);
-            return [];
+            console.error('Failed to load auctions:', err);
+            throw err;
         } finally {
             setIsLoading(false);
         }

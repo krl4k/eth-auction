@@ -4,8 +4,21 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  theme: {
-    extend: {},
-  },
   plugins: [],
+  theme: {
+    extend: {
+      colors: {
+        primary: {
+          DEFAULT: '#0070f3',
+          foreground: 'white',
+        },
+        foreground: {
+          DEFAULT: '#000000',
+        },
+        muted: {
+          foreground: '#666666',
+        },
+      },
+    },
+  },
 }

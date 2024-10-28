@@ -1,4 +1,3 @@
-// components/Navigation.js
 import React from 'react';
 import { cn } from "../lib/utils";
 
@@ -10,24 +9,50 @@ const Navigation = ({ activeTab, onTabChange }) => {
     ];
 
     return (
-        <div className="border-b">
-            <nav className="container mx-auto flex justify-center space-x-8">
-                {tabs.map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => onTabChange(tab.id)}
-                        className={cn(
-                            "px-4 py-2 relative",
-                            "hover:text-primary transition-colors",
-                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary",
-                            activeTab === tab.id ? "text-primary" : "text-muted-foreground",
-                            "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5",
-                            activeTab === tab.id ? "after:bg-primary" : "after:bg-transparent",
-                            "after:transition-colors"
-                        )}
-                    >
-                        {tab.label}
-                    </button>
+        <div className="border-b bg-white sticky top-0 z-10">
+            <nav className="container mx-auto flex border-b">
+                {tabs.map((tab, index) => (
+                    <React.Fragment key={tab.id}>
+                        <button
+                            onClick={() => onTabChange(tab.id)}
+                            className={cn(
+                                "flex-1 px-4 py-3 relative transition-all duration-200",
+                                "text-base font-medium",
+                                "hover:bg-slate-50 active:bg-slate-100",
+                                "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary",
+
+                                activeTab === tab.id ? (
+                                    "text-primary border-b-2 border-primary"
+                                ) : (
+                                    "text-muted-foreground hover:text-foreground"
+                                ),
+
+                                "border-r border-slate-200 last:border-r-0",
+
+                                "group cursor-pointer",
+                            )}
+                        >
+                            {/* Текст вкладки */}
+                            <span className={cn(
+                                "relative z-10",
+                                // Анимация при наведении
+                                "group-hover:transform group-hover:scale-105 transition-transform duration-200",
+                            )}>
+                {tab.label}
+              </span>
+
+                            {/* Индикатор активной вкладки */}
+                            {activeTab === tab.id && (
+                                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                            )}
+
+                            {/* Эффект при нажатии */}
+                            <span className={cn(
+                                "absolute inset-0 transform transition-transform duration-200",
+                                "active:scale-95"
+                            )} />
+                        </button>
+                    </React.Fragment>
                 ))}
             </nav>
         </div>

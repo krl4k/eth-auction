@@ -42,6 +42,7 @@ function App() {
     const loadAuctions = async () => {
         try {
             const loadedAuctions = await getAuctions();
+            setError('');
             setAuctions(loadedAuctions);
         } catch (err) {
             setError('Failed to load auctions');
@@ -65,7 +66,8 @@ function App() {
             });
 
             await loadAuctions();
-            setActiveTab('auctions'); // Переключаемся на вкладку с аукционами после создания
+            setActiveTab('auctions');
+            setError('');
         } catch (err) {
             setError('Failed to create auction');
         }
@@ -75,6 +77,7 @@ function App() {
         try {
             await buyItem(auctionId, price);
             await loadAuctions();
+            setError('');
         } catch (err) {
             setError('Failed to buy item');
         }
@@ -84,12 +87,12 @@ function App() {
         try {
             await cancelAuction(auctionId);
             await loadAuctions();
+            setError('');
         } catch (err) {
             setError('Failed to cancel auction');
         }
     };
 
-    // Фильтрация для "Мои аукционы"
     const myAuctions = auctions.filter(
         auction => auction.seller.toLowerCase() === account?.toLowerCase()
     );
@@ -143,6 +146,12 @@ function App() {
         }
     }, [account]);
 
+    useEffect(() => {
+        return () => {
+            setError('');
+        };
+    }, []);
+
     // Показываем экран загрузки только при первичной инициализации
     if (web3Loading && !account) {
         return <LoadingScreen />;
@@ -181,7 +190,12 @@ function App() {
             />
 
             <main className="flex-1 container mx-auto p-4">
-                <ErrorAlert error={error || web3Error} />
+                {(error || web3Error) && (
+                    <ErrorAlert
+                        error={error || web3Error}
+                        onClose={() => setError('')}
+                    />
+                )}
                 {renderContent()}
             </main>
 

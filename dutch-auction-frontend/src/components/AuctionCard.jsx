@@ -17,17 +17,46 @@ const AuctionCard = ({
     };
 
     const calculateTimeLeft = () => {
-        const now = Date.now() / 1000; // текущее время в секундах
+        const now = Math.floor(Date.now() / 1000);
         const endTime = Number(auction.startAt) + Number(auction.duration);
         const diff = endTime - now;
 
-        if (diff <= 0) return 'Завершен';
+        if (diff <= 0) {
+            setIsExpired(true);
+            return 'Завершен';
+        }
 
         const minutes = Math.floor(diff / 60);
         const seconds = Math.floor(diff % 60);
         return `${minutes}м ${seconds}с`;
     };
 
+    const getStatus = () => {
+        if (!auction.active) {
+            const now = Math.floor(Date.now() / 1000);
+            const endTime = Number(auction.startAt) + Number(auction.duration);
+            if (now >= endTime) {
+                return 'Завершен';
+            }
+            return 'Отменен';
+        }
+        return 'Активный';
+    };
+
+    // Получение цвета статуса
+    const getStatusColor = () => {
+        if (!auction.active) {
+            const now = Math.floor(Date.now() / 1000);
+            const endTime = Number(auction.startAt) + Number(auction.duration);
+            if (now >= endTime) {
+                return 'text-yellow-600';
+            }
+            return 'text-red-600';
+        }
+        return 'text-green-600';
+    };
+
+    
     useEffect(() => {
         if (!auction.active) return;
 
